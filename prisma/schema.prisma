@@ -1,0 +1,193 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  password  String
+  role      Role       @default(USER)
+  avatar    String?
+  bio       String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  dashboards         CustomDashboard[]
+  predictions        Prediction[]
+  notes              Note[]
+  favorites          Favorite[]
+  comparisons        SavedComparison[]
+  comments           Comment[]
+  reports            Report[]
+  sharedDashboards   SharedDashboard[]
+  notifications      Notification[]
+
+  @@index([email])
+}
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model CustomDashboard {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  layout    Json? // Store widget configuration
+  isPublic  Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sharedWith SharedDashboard[]
+  comments   Comment[]
+
+  @@index([userId])
+}
+
+model SharedDashboard {
+  id          String            @id @default(cuid())
+  dashboardId String
+  dashboard   CustomDashboard   @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission  SharePermission   @default(VIEW)
+  createdAt   DateTime          @default(now())
+
+  @@unique([dashboardId, userId])
+  @@index([dashboardId])
+  @@index([userId])
+}
+
+enum SharePermission {
+  VIEW
+  EDIT
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      FavoriteType // TEAM or PLAYER
+  externalId String // NBA API ID or similar
+  name      String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, externalId])
+  @@index([userId])
+}
+
+enum FavoriteType {
+  TEAM
+  PLAYER
+}
+
+model Prediction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId    String   // External game ID
+  prediction String  // JSON: {team1: "name", prediction: "win/loss/draw", confidence: 0.85}
+  result    String?  // CORRECT, INCORRECT, PENDING
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([gameId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  tags      String[] // Array of tag strings
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SavedComparison {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   // PLAYER_VS_PLAYER, TEAM_VS_TEAM
+  data      Json     // Store comparison data
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dashboardId String
+  dashboard   CustomDashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([dashboardId])
+}
+
+model Report {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReportType
+  reason    String
+  content   String
+  status    ReportStatus @default(PENDING)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum ReportType {
+  CONTENT
+  USER
+  COMMENT
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // SHARED_DASHBOARD, COMMENT, etc
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
